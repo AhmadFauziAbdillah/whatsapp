@@ -29,7 +29,7 @@ async function connectToWhatsApp() {
         
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: false,
+            printQRInTerminal: true, // UBAH KE TRUE untuk debug
             logger: pino({ level: 'silent' }),
             browser: ['Warranty System', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
@@ -41,7 +41,7 @@ async function connectToWhatsApp() {
             const { connection, lastDisconnect, qr } = update;
             
             if (qr) {
-                console.log('📱 QR Code generated');
+                console.log('📱 QR Code generated - Length:', qr.length);
                 currentQR = qr;
                 qrGenerated = true;
                 isConnected = false;
@@ -88,8 +88,10 @@ function formatPhoneNumber(phone) {
     return formatted;
 }
 
-// Root endpoint - Landing page
+// Root endpoint - Landing page dengan QR Code fix
 app.get('/', (req, res) => {
+    const qrData = currentQR ? JSON.stringify(currentQR).replace(/'/g, "\\'") : null;
+    
     const html = `
     <!DOCTYPE html>
     <html>
@@ -154,6 +156,7 @@ app.get('/', (req, res) => {
                 padding: 4px 8px;
                 border-radius: 4px;
                 font-size: 0.9em;
+                word-break: break-all;
             }
             .qr-section {
                 text-align: center;
@@ -168,6 +171,7 @@ app.get('/', (req, res) => {
                 background: white;
                 display: inline-block;
                 border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             }
             button {
                 background: #667eea;
@@ -183,8 +187,15 @@ app.get('/', (req, res) => {
             button:hover {
                 background: #5568d3;
             }
+            .debug {
+                background: #fef3c7;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 10px 0;
+                font-size: 0.9em;
+                color: #92400e;
+            }
         </style>
-        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     </head>
     <body>
         <div class="container">
@@ -193,13 +204,16 @@ app.get('/', (req, res) => {
                 ${isConnected ? '✅ Connected' : '❌ Disconnected'}
             </div>
             
-            ${!isConnected && qrGenerated ? `
+            ${!isConnected && qrGenerated && qrData ? `
             <div class="qr-section">
                 <h3>📱 Scan QR Code dengan WhatsApp</h3>
                 <p>Buka WhatsApp → Linked Devices → Link a Device</p>
                 <canvas id="qrcode"></canvas>
                 <br>
                 <button onclick="window.location.reload()">🔄 Refresh QR</button>
+                <div class="debug">
+                    ✅ QR Code berhasil di-generate (${qrData ? 'Ada data' : 'Tidak ada data'})
+                </div>
             </div>
             ` : ''}
             
@@ -214,6 +228,7 @@ app.get('/', (req, res) => {
                 <p><strong>📡 Server Status:</strong> Online</p>
                 <p><strong>🔗 Bot Number:</strong> ${isConnected && sock?.user ? sock.user.id.split(':')[0] : 'Not connected'}</p>
                 <p><strong>⏰ Uptime:</strong> ${Math.floor(process.uptime())} seconds</p>
+                <p><strong>🔑 QR Status:</strong> ${qrGenerated ? 'Generated ✅' : 'Not yet ⏳'}</p>
             </div>
             
             <div class="endpoints">
@@ -237,18 +252,35 @@ app.get('/', (req, res) => {
             </div>
         </div>
         
+        <!-- Load QRCode library -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        
         <script>
-            ${qrGenerated && currentQR ? `
-            QRCode.toCanvas(document.getElementById('qrcode'), '${currentQR}', {
-                width: 300,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, function (error) {
-                if (error) console.error(error);
-            });
+            // Generate QR Code
+            ${qrGenerated && qrData ? `
+            try {
+                const qrData = ${qrData};
+                console.log('QR Data received:', qrData ? 'Yes' : 'No');
+                
+                // Clear previous QR
+                const qrContainer = document.getElementById('qrcode');
+                qrContainer.innerHTML = '';
+                
+                // Generate new QR
+                new QRCode(qrContainer, {
+                    text: qrData,
+                    width: 280,
+                    height: 280,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.L
+                });
+                
+                console.log('✅ QR Code rendered successfully');
+            } catch (error) {
+                console.error('❌ Error rendering QR:', error);
+                document.getElementById('qrcode').innerHTML = '<p style="color:red;">Error rendering QR code. Check console.</p>';
+            }
             ` : ''}
             
             // Auto refresh status every 5 seconds
@@ -266,6 +298,10 @@ app.get('/', (req, res) => {
                         } else {
                             statusEl.className = 'status disconnected';
                             statusEl.textContent = '❌ Disconnected';
+                            // Reload if QR should be available
+                            if (data.qrRequired && !${qrGenerated}) {
+                                setTimeout(() => window.location.reload(), 3000);
+                            }
                         }
                     })
                     .catch(err => console.error('Status check failed:', err));
@@ -279,6 +315,7 @@ app.get('/', (req, res) => {
 
 // API: Get QR Code
 app.get('/qr', (req, res) => {
+    console.log('QR requested - Available:', !!currentQR, 'Connected:', isConnected);
     if (currentQR) {
         res.json({
             success: true,
@@ -350,6 +387,7 @@ app.get('/status', (req, res) => {
     res.json({
         status: isConnected ? 'connected' : 'disconnected',
         qrRequired: qrGenerated,
+        qrAvailable: !!currentQR,
         botNumber: sock?.user?.id ? sock.user.id.split(':')[0] : null,
         uptime: process.uptime()
     });
