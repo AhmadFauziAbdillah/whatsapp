@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "WhatsApp Bot for Warranty System using Baileys",
   "main": "bot.js",
+  "type": "module",
   "scripts": {
     "start": "node bot.js"
   },
