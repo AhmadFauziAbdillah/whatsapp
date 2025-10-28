@@ -1,8 +1,12 @@
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const express = require('express');
-const pino = require('pino');
-const fs = require('fs');
-const path = require('path');
+import { default as makeWASocket, DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import express from 'express';
+import pino from 'pino';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -13,7 +17,7 @@ let isConnected = false;
 let currentQR = null;
 
 // Pastikan folder auth ada
-const authFolder = path.join(__dirname, 'auth_info_baileys');
+const authFolder = join(__dirname, 'auth_info_baileys');
 if (!fs.existsSync(authFolder)) {
     fs.mkdirSync(authFolder, { recursive: true });
 }
@@ -25,7 +29,7 @@ async function connectToWhatsApp() {
         
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: false, // Matikan print QR (Railway tidak support terminal)
+            printQRInTerminal: false,
             logger: pino({ level: 'silent' }),
             browser: ['Warranty System', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
@@ -154,12 +158,16 @@ app.get('/', (req, res) => {
             .qr-section {
                 text-align: center;
                 margin: 20px 0;
+                padding: 20px;
+                background: #f9fafb;
+                border-radius: 10px;
             }
             #qrcode {
                 margin: 20px auto;
                 padding: 20px;
                 background: white;
                 display: inline-block;
+                border-radius: 10px;
             }
             button {
                 background: #667eea;
@@ -189,8 +197,16 @@ app.get('/', (req, res) => {
             <div class="qr-section">
                 <h3>📱 Scan QR Code dengan WhatsApp</h3>
                 <p>Buka WhatsApp → Linked Devices → Link a Device</p>
-                <div id="qrcode"></div>
-                <button onclick="refreshQR()">🔄 Refresh QR</button>
+                <canvas id="qrcode"></canvas>
+                <br>
+                <button onclick="window.location.reload()">🔄 Refresh QR</button>
+            </div>
+            ` : ''}
+            
+            ${!isConnected && !qrGenerated ? `
+            <div class="qr-section">
+                <p>⏳ Generating QR Code...</p>
+                <p>Please wait or <button onclick="window.location.reload()" style="display:inline;padding:8px 16px;margin:0 5px;">Refresh</button></p>
             </div>
             ` : ''}
             
@@ -225,13 +241,15 @@ app.get('/', (req, res) => {
             ${qrGenerated && currentQR ? `
             QRCode.toCanvas(document.getElementById('qrcode'), '${currentQR}', {
                 width: 300,
-                margin: 2
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function (error) {
+                if (error) console.error(error);
             });
             ` : ''}
-            
-            function refreshQR() {
-                window.location.reload();
-            }
             
             // Auto refresh status every 5 seconds
             setInterval(() => {
@@ -243,13 +261,14 @@ app.get('/', (req, res) => {
                             statusEl.className = 'status connected';
                             statusEl.textContent = '✅ Connected';
                             if (document.querySelector('.qr-section')) {
-                                window.location.reload();
+                                setTimeout(() => window.location.reload(), 2000);
                             }
                         } else {
                             statusEl.className = 'status disconnected';
                             statusEl.textContent = '❌ Disconnected';
                         }
-                    });
+                    })
+                    .catch(err => console.error('Status check failed:', err));
             }, 5000);
         </script>
     </body>
@@ -352,6 +371,6 @@ process.on('SIGTERM', async () => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📡 Railway URL: ${process.env.RAILWAY_PUBLIC_DOMAIN || 'localhost'}`);
+    console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
     connectToWhatsApp();
 });
