@@ -358,7 +358,7 @@ app.get('/', (req, res) => {
                 <p><strong>🔗 Bot Number:</strong> ${isConnected && sock?.user ? sock.user.id.split(':')[0] : 'Not connected'}</p>
                 <p><strong>📛 Bot Name:</strong> ${isConnected && sock?.user?.name ? sock.user.name : 'N/A'}</p>
                 <p><strong>⏰ Uptime:</strong> ${Math.floor(process.uptime())} seconds</p>
-                <p><strong>🔑 Status:</strong> ${isConnected ? '✅ Connected' : qrGenerated ? '⏳ Waiting for scan' : '❌ Disconnected'}</p>
+                <p><strong>🔒 Status:</strong> ${isConnected ? '✅ Connected' : qrGenerated ? '⏳ Waiting for scan' : '❌ Disconnected'}</p>
                 <p><strong>🔄 Attempts:</strong> ${connectionAttempts}/${MAX_RETRY_ATTEMPTS}</p>
             </div>
             
@@ -436,7 +436,7 @@ app.get('/', (req, res) => {
                     .then(data => {
                         const statusEl = document.getElementById('status');
                         
-                        if (data.status === 'connected' && !${isConnected}) {
+                        if (data.connected && !${isConnected}) {
                             window.location.reload();
                         } else if (data.qrAvailable && !${qrGenerated}) {
                             checkCount++;
@@ -558,10 +558,11 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-// API: Status
+// API: Status - UPDATED FOR PHP COMPATIBILITY
 app.get('/status', (req, res) => {
     res.json({
-        status: isConnected ? 'connected' : 'disconnected',
+        connected: isConnected,  // ✅ Field yang dibutuhkan PHP
+        status: isConnected ? 'connected' : 'disconnected',  // Backward compatibility
         qrRequired: qrGenerated,
         qrAvailable: !!currentQR,
         botNumber: sock?.user?.id ? sock.user.id.split(':')[0] : null,
