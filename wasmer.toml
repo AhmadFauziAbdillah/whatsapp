@@ -1,0 +1,4 @@
+[package]
+name = "your-username/whatsapp-bot"
+version = "1.0.0"
+description = "WhatsApp Bot using Baileys"
