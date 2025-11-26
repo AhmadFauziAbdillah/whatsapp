@@ -1,4 +1,34 @@
 [package]
-name = "your-username/whatsapp-bot"
+name = "yrteam/whatsapp-bot"
 version = "1.0.0"
 description = "WhatsApp Bot using Baileys"
+
+[dependencies]
+"wasmer/winterjs" = "^1"
+
+[[module]]
+name = "whatsapp-bot"
+source = "bot.js"
+abi = "wasi"
+
+[module.interfaces]
+wasi = "0.0.0-unstable"
+
+[[command]]
+name = "start"
+module = "whatsapp-bot"
+runner = "https://webc.org/runner/wasi"
+
+[fs]
+"/app" = "."
+
+[build]
+command = "npm install"
+
+[app]
+name = "whatsapp-bot"
+domains = []
+
+[app.env]
+PORT = "3000"
+NODE_ENV = "production"
