@@ -1,0 +1,12 @@
+kind: "ApplicationV1"
+metadata:
+  name: "whatsapp-bot"
+spec:
+  package:
+    registry: "wasmer.io"
+    namespace: "your-username"
+    name: "whatsapp-bot"
+    version: "1.0.0"
+  env:
+    - name: "PORT"
+      value: "3000"
